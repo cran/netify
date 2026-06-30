@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Cassy Dorff and Shahryar Minhas" />
+
+<meta name="date" content="2026-06-25" />
+
+<title>Pipeline: netify to ergm (statnet)</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Pipeline: netify to ergm (statnet)</h1>
+<h4 class="author">Cassy Dorff and Shahryar Minhas</h4>
+<h4 class="date">2026-06-25</h4>
+
+
+
+<p>ERGMs (Exponential Random Graph Models) are the workhorse of
+inferential network analysis in the <a href="https://statnet.org/">statnet</a> ecosystem. With
+<code>netify</code>, build the network, attach attributes with
+<code>add_node_vars()</code> / <code>add_dyad_vars()</code>, then
+convert to the <code>network</code> format that <code>ergm</code>
+expects with <code>to_statnet()</code>.</p>
+<p>This vignette covers:</p>
+<ol style="list-style-type: decimal">
+<li>The cross-sectional pipeline (single network -&gt; single ergm
+fit)</li>
+<li>The longitudinal pipeline (per-time ergm fits)</li>
+<li>The multilayer pipeline (per-layer ergm fits –
+<code>to_statnet()</code> now iterates layers automatically)</li>
+<li>Round-tripping ergm-simulated networks back into netify for
+descriptive checks</li>
+</ol>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(netify)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">library</span>(network)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; &#39;network&#39; 1.20.0 (2026-02-06), part of the Statnet Project</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt; * &#39;news(package=&quot;network&quot;)&#39; for changes since last version</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; * &#39;citation(&quot;network&quot;)&#39; for citation information</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; * &#39;https://statnet.org&#39; for help, support, and other information</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="fu">library</span>(ergm)</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; &#39;ergm&#39; 4.12.0 (2026-02-17), part of the Statnet Project</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; * &#39;news(package=&quot;ergm&quot;)&#39; for changes since last version</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; * &#39;citation(&quot;ergm&quot;)&#39; for citation information</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; * &#39;https://statnet.org&#39; for help, support, and other information</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; &#39;ergm&#39; 4 is a major update that introduces some backwards-incompatible</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt; changes. Please type &#39;news(package=&quot;ergm&quot;)&#39; for a list of major</span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt; changes.</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="fu">data</span>(icews)</span></code></pre></div>
+<div id="cross-sectional-pipeline" class="section level2">
+<h2>1. cross-sectional pipeline</h2>
+<p>The simplest case: one snapshot, one model.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># build a single-year netify object with nodal and dyadic attributes</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>icews_2010 <span class="ot">&lt;-</span> icews[icews<span class="sc">$</span>year <span class="sc">==</span> <span class="dv">2010</span>, ]</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>verb_coop <span class="ot">&lt;-</span> <span class="fu">netify</span>(</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    icews_2010,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    <span class="at">symmetric =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>    <span class="at">weight   =</span> <span class="st">&quot;verbCoop&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>    <span class="at">nodal_vars =</span> <span class="fu">c</span>(<span class="st">&quot;i_polity2&quot;</span>, <span class="st">&quot;i_log_gdp&quot;</span>),</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>    <span class="at">dyad_vars  =</span> <span class="st">&quot;matlCoop&quot;</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>)</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co"># convert to statnet &#39;network&#39; object</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>sn_2010 <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(verb_coop)</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt; ! Nodal columns with &quot;NA&quot; detected: &quot;i_polity2&quot; and &quot;i_log_gdp&quot;. Ergm terms</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt;   like `nodecov()`/`nodematch()` will refuse to fit.</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; ℹ Use `drop_na_actors(net, cols = c(&#39;i_polity2&#39;, &#39;i_log_gdp&#39;))` (or impute)</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt;   before refitting.</span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt; ℹ Dyad covariates attached as per-edge attributes under &quot;matlCoop_e&quot; and as</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   network-level matrices under their original names (&quot;matlCoop&quot;).</span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt; ℹ For `ergm::edgecov()` use the matrix name (e.g. `edgecov(&#39;matlCoop&#39;)`); the</span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt;   &quot;_e&quot; per-edge attribute is for descriptive use such as edge styling.</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#&gt; This message is displayed once per session.</span></span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>sn_2010</span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co">#&gt;  Network attributes:</span></span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co">#&gt;   vertices = 152 </span></span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co">#&gt;   directed = TRUE </span></span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co">#&gt;   hyper = FALSE </span></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co">#&gt;   loops = FALSE </span></span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="co">#&gt;   multiple = FALSE </span></span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a><span class="co">#&gt;   bipartite = FALSE </span></span>
+<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a><span class="co">#&gt;   verbCoop: 152x152 matrix</span></span>
+<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a><span class="co">#&gt;   matlCoop: 152x152 matrix</span></span>
+<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a><span class="co">#&gt;   total edges= 9976 </span></span>
+<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a><span class="co">#&gt;     missing edges= 0 </span></span>
+<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a><span class="co">#&gt;     non-missing edges= 9976 </span></span>
+<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a><span class="co">#&gt;  Vertex attribute names: </span></span>
+<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a><span class="co">#&gt;     i_log_gdp i_polity2 vertex.names </span></span>
+<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a><span class="co">#&gt;  Edge attribute names not shown</span></span></code></pre></div>
+<p><code>to_statnet()</code> carries nodal attributes through as vertex
+attributes and dyadic attributes through as edge attributes.</p>
+<div id="before-you-fit-three-sanity-checks" class="section level3">
+<h3>before you fit: three sanity checks</h3>
+<p>ERGMs fail in cryptic ways when the underlying network is malformed.
+Three checks catch most “invalid output from statistic” headaches before
+you ever call <code>ergm()</code>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># 1. nas in nodal covariates referenced by nodecov / nodematch</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>nd <span class="ot">&lt;-</span> <span class="fu">attr</span>(verb_coop, <span class="st">&quot;nodal_data&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>na_cols <span class="ot">&lt;-</span> <span class="fu">names</span>(nd)[<span class="fu">vapply</span>(nd, <span class="cf">function</span>(c) <span class="fu">any</span>(<span class="fu">is.na</span>(c)), <span class="fu">logical</span>(<span class="dv">1</span>))]</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>na_cols <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(na_cols, <span class="fu">c</span>(<span class="st">&quot;actor&quot;</span>, <span class="st">&quot;time&quot;</span>, <span class="st">&quot;layer&quot;</span>))</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>na_cols</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;i_polity2&quot; &quot;i_log_gdp&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co"># 2. isolates -- ergm fits but some terms (e.g. gwdegree) degenerate</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">get_raw</span>(verb_coop)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>bin <span class="ot">&lt;-</span> (m <span class="sc">!=</span> <span class="dv">0</span>) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(m)</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>deg_total <span class="ot">&lt;-</span> <span class="fu">rowSums</span>(bin) <span class="sc">+</span> <span class="fu">colSums</span>(bin)</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>isolates <span class="ot">&lt;-</span> <span class="fu">rownames</span>(m)[deg_total <span class="sc">==</span> <span class="dv">0</span>]</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="fu">length</span>(isolates)</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; [1] 0</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co"># 3. symmetry: the netify flag must match how your model treats ties</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="fu">attr</span>(verb_coop, <span class="st">&quot;symmetric&quot;</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; [1] FALSE</span></span></code></pre></div>
+<p>If <code>na_cols</code> is non-empty, drop the affected actors with
+<code>drop_na_actors(verb_coop, cols = na_cols)</code> or impute before
+converting. Here we create a cleaned network before showing a model
+formula that uses nodal covariates:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>clean_cols <span class="ot">&lt;-</span> <span class="fu">attr</span>(sn_2010, <span class="st">&quot;netify_na_cols&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">is.null</span>(clean_cols)) clean_cols <span class="ot">&lt;-</span> na_cols</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(clean_cols) <span class="sc">&amp;&amp;</span> <span class="fu">length</span>(clean_cols) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    verb_coop_clean <span class="ot">&lt;-</span> <span class="fu">drop_na_actors</span>(verb_coop, <span class="at">cols =</span> clean_cols)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    verb_coop_clean <span class="ot">&lt;-</span> verb_coop</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>}</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; ℹ Dropped 5 of 152 actors with NA covariates: &quot;Afghanistan&quot;, &quot;Bosnia And</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt;   Herzegovina&quot;, &quot;Djibouti&quot;, &quot;Korea, Democratic People&#39;s Republic Of&quot;, and</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt;   &quot;Somalia&quot;.</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; This message is displayed once per session.</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>sn_2010_clean <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(verb_coop_clean)</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="fu">attr</span>(sn_2010_clean, <span class="st">&quot;netify_na_cols&quot;</span>)</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; character(0)</span></span></code></pre></div>
+<p>Now fit an ergm against the cleaned network:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># note: this chunk is not evaluated by default to keep vignette build fast.</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co"># replace eval = false with eval = true to actually run.</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6886</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">ergm</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    sn_2010_clean <span class="sc">~</span> edges <span class="sc">+</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>        <span class="fu">nodecov</span>(<span class="st">&quot;i_polity2&quot;</span>) <span class="sc">+</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        <span class="fu">nodecov</span>(<span class="st">&quot;i_log_gdp&quot;</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="fu">summary</span>(m)</span></code></pre></div>
+<p>The full model above is not evaluated during vignette builds. The
+short block below checks the <code>netify()</code> -&gt;
+<code>to_statnet()</code> -&gt; <code>ergm()</code> handoff:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>toy_edges <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="at">i =</span> <span class="fu">c</span>(<span class="st">&quot;a&quot;</span>, <span class="st">&quot;a&quot;</span>, <span class="st">&quot;b&quot;</span>, <span class="st">&quot;c&quot;</span>),</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="at">j =</span> <span class="fu">c</span>(<span class="st">&quot;b&quot;</span>, <span class="st">&quot;c&quot;</span>, <span class="st">&quot;c&quot;</span>, <span class="st">&quot;d&quot;</span>),</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="at">y =</span> <span class="dv">1</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>toy_net <span class="ot">&lt;-</span> <span class="fu">suppressMessages</span>(<span class="fu">netify</span>(</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    toy_edges,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>    <span class="at">weight =</span> <span class="st">&quot;y&quot;</span>, <span class="at">symmetric =</span> <span class="cn">FALSE</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>))</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>toy_sn <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(toy_net)</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6886</span>)</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="fu">invisible</span>(<span class="fu">capture.output</span>(</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>    toy_fit <span class="ot">&lt;-</span> <span class="fu">ergm</span>(toy_sn <span class="sc">~</span> edges, <span class="at">estimate =</span> <span class="st">&quot;MPLE&quot;</span>, <span class="at">eval.loglik =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>))</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt; Starting maximum pseudolikelihood estimation (MPLE):</span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt; Obtaining the responsible dyads.</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; Evaluating the predictor and response matrix.</span></span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; Maximizing the pseudolikelihood.</span></span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt; Finished MPLE.</span></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="fu">coef</span>(toy_fit)</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt;      edges </span></span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#&gt; -0.6931472</span></span></code></pre></div>
+<p>One common ERGM failure comes from missing nodal covariates:
+<code>ergm::nodecov(&quot;i_polity2&quot;)</code> will refuse to fit if any vertex
+has an <code>NA</code> polity score. Either subset to actors with
+complete covariates or impute before passing to
+<code>to_statnet()</code>. When <code>to_statnet()</code> sees NAs in
+nodal attributes, it records the affected column names on the output
+object. The <code>drop_na_actors()</code> helper handles this for
+cross-sectional, longitudinal, and bipartite netlets. Use the same
+approach before formulas that reference nodal attributes with
+<code>ergm::nodecov()</code> or <code>ergm::nodematch()</code>.</p>
+</div>
+<div id="dyadic-edge-covariates-the-_e-suffix" class="section level3">
+<h3>dyadic edge covariates: the <code>_e</code> suffix</h3>
+<p>Any dyadic covariate you passed to <code>netify()</code>
+(e.g. <code>dyad_vars = &quot;matlCoop&quot;</code>) is attached to the resulting
+<code>network</code> object in two places:</p>
+<ul>
+<li>as a network-level attribute under its original name (the full
+<code>n x n</code> matrix), accessible via
+<code>network::get.network.attribute(sn, &quot;matlCoop&quot;)</code>, and</li>
+<li>as a per-edge attribute under <code>&lt;var&gt;_e</code> (here,
+<code>matlCoop_e</code>), populated only on edges that actually
+exist.</li>
+</ul>
+<p>The trailing <code>_e</code> disambiguates the per-edge edgelist from
+the network-level matrix. For <code>ergm::edgecov()</code>, pass the
+<strong>original (matrix) name</strong> – <code>edgecov()</code>
+resolves its argument as a network-level matrix attribute, so the
+<code>_e</code> per-edge alias will not work there:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">ergm</span>(sn_2010 <span class="sc">~</span> edges <span class="sc">+</span> <span class="fu">edgecov</span>(<span class="st">&quot;matlCoop&quot;</span>))</span></code></pre></div>
+<p>The <code>_e</code> per-edge attribute is exposed for descriptive
+uses (for example, coloring edges by covariate in
+<code>network::plot.network</code>). <code>to_statnet()</code> emits a
+one-shot inform listing both forms the first time it attaches dyadic
+covariates.</p>
+<p>Goodness-of-fit, mcmc.diagnostics, and other postestimation tools
+live in <code>ergm</code> itself.</p>
+</div>
+</div>
+<div id="longitudinal-pipeline-per-time-fits" class="section level2">
+<h2>2. longitudinal pipeline (per-time fits)</h2>
+<p>For a longitudinal netify, <code>to_statnet()</code> returns a named
+list – one <code>network</code> object per time period:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>verb_longit <span class="ot">&lt;-</span> <span class="fu">netify</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>    icews[icews<span class="sc">$</span>year <span class="sc">%in%</span> <span class="dv">2010</span><span class="sc">:</span><span class="dv">2012</span>, ],</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>, <span class="at">time =</span> <span class="st">&quot;year&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>    <span class="at">symmetric =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    <span class="at">weight =</span> <span class="st">&quot;verbCoop&quot;</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>    <span class="at">nodal_vars =</span> <span class="st">&quot;i_polity2&quot;</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>)</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>sn_list <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(verb_longit)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; ! Nodal columns with &quot;NA&quot; detected: &quot;i_polity2&quot;. Ergm terms like</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt;   `nodecov()`/`nodematch()` will refuse to fit.</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; ℹ Use `drop_na_actors(net, cols = c(&#39;i_polity2&#39;))` (or impute) before</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt;   refitting.</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; This message is displayed once per session.</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="fu">length</span>(sn_list)</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a><span class="co">#&gt; [1] 3</span></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="fu">names</span>(sn_list)</span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a><span class="co">#&gt; [1] &quot;2010&quot; &quot;2011&quot; &quot;2012&quot;</span></span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="fu">class</span>(sn_list[[<span class="dv">1</span>]])</span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a><span class="co">#&gt; [1] &quot;network&quot;</span></span></code></pre></div>
+<p>Fit a separate ergm per period:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6886</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>fits <span class="ot">&lt;-</span> <span class="fu">lapply</span>(sn_list, <span class="cf">function</span>(n) {</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="fu">ergm</span>(n <span class="sc">~</span> edges)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>})</span></code></pre></div>
+<p>For <em>coevolution</em> models (where ties change as a function of
+past ties), look at <code>tergm</code> from the statnet suite –
+<code>netify</code> provides the data, <code>tergm</code> does the
+modeling. A typical tergm 4.x call against the same per-period list
+looks like this:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># longitudinal ergm via tergm 4.x</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">library</span>(tergm)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6886</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>nets <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(verb_longit)   <span class="co"># named list of network objects</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">tergm</span>(</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    nets <span class="sc">~</span> <span class="fu">Form</span>(<span class="sc">~</span> edges) <span class="sc">+</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>           <span class="fu">Persist</span>(<span class="sc">~</span> edges),</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">estimate =</span> <span class="st">&quot;CMLE&quot;</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    <span class="at">times =</span> <span class="fu">seq_along</span>(nets)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">summary</span>(fit)</span></code></pre></div>
+<p>In the tergm 4.x split formulation, <code>Form()</code> models the
+<em>formation</em> of new edges between periods, and
+<code>Persist()</code> models the <em>persistence</em> of existing edges
+from one period to the next; both formulas accept the same ergm terms
+(<code>edges</code>, <code>ergm::nodecov()</code>,
+<code>ergm::nodematch()</code>, <code>mutual</code>, <code>gwesp</code>,
+etc.). Add nodal covariates after applying the same missing-data check
+shown in the cross-sectional example.</p>
+</div>
+<div id="multilayer-pipeline-per-layer-fits" class="section level2">
+<h2>3. multilayer pipeline (per-layer fits)</h2>
+<p>Multilayer ergm modeling is its own research literature. The simple
+pragmatic approach is to fit one ergm per layer.
+<code>to_statnet()</code> handles this automatically: pass a multilayer
+netify, get back a named list keyed by layer.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>verb <span class="ot">&lt;-</span> <span class="fu">netify</span>(icews_2010, <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>,</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>               <span class="at">symmetric =</span> <span class="cn">FALSE</span>, <span class="at">weight =</span> <span class="st">&quot;verbCoop&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>matl <span class="ot">&lt;-</span> <span class="fu">netify</span>(icews_2010, <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>               <span class="at">symmetric =</span> <span class="cn">FALSE</span>, <span class="at">weight =</span> <span class="st">&quot;matlCoop&quot;</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>multi <span class="ot">&lt;-</span> <span class="fu">layer_netify</span>(<span class="fu">list</span>(<span class="at">verbal =</span> verb, <span class="at">material =</span> matl))</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>sn_multi <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(multi)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="fu">length</span>(sn_multi)</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="fu">names</span>(sn_multi)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="co">#&gt; [1] &quot;verbal&quot;   &quot;material&quot;</span></span></code></pre></div>
+<p>Each element is a <code>network</code> object you can plug straight
+into <code>ergm()</code>.</p>
+</div>
+<div id="round-tripping-simulated-networks-back-to-netify" class="section level2">
+<h2>4. round-tripping simulated networks back to netify</h2>
+<p>A useful descriptive check after fitting an ergm is to simulate from
+the fit, compute descriptives on the simulated networks, and compare to
+the observed network. <code>simulate.ergm()</code> returns
+<code>network</code> objects, which means you can pipe them straight
+back into a netify for any of netify’s descriptive tools:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6886</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co"># m is the fitted ergm object from the model chunk above</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>sims <span class="ot">&lt;-</span> <span class="fu">simulate</span>(m, <span class="at">nsim =</span> <span class="dv">100</span>)  <span class="co"># list of network objects</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co"># convert each simulated network back into a netify for comparison</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>sim_nets <span class="ot">&lt;-</span> <span class="fu">lapply</span>(sims, <span class="cf">function</span>(s) <span class="fu">to_netify</span>(s))</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="co"># compare observed vs simulated at the structural level</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>all_nets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">list</span>(<span class="at">observed =</span> verb_coop), sim_nets)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>struct_comp <span class="ot">&lt;-</span> <span class="fu">compare_networks</span>(all_nets, <span class="at">what =</span> <span class="st">&quot;structure&quot;</span>)</span></code></pre></div>
+<p>This gives observed-vs-simulated comparisons for density,
+reciprocity, transitivity, mean degree, and related summaries.</p>
+</div>
+<div id="tldr" class="section level2">
+<h2>tl;dr</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># build -&gt; attach attrs -&gt; export -&gt; model</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>net <span class="ot">&lt;-</span> <span class="fu">netify</span>(df, <span class="at">actor1 =</span> <span class="st">&quot;i&quot;</span>, <span class="at">actor2 =</span> <span class="st">&quot;j&quot;</span>, <span class="at">symmetric =</span> <span class="cn">FALSE</span>, <span class="at">weight =</span> <span class="st">&quot;x&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>net <span class="ot">&lt;-</span> <span class="fu">add_node_vars</span>(net, attrs, <span class="at">actor =</span> <span class="st">&quot;id&quot;</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>sn  <span class="ot">&lt;-</span> <span class="fu">to_statnet</span>(net)               <span class="co"># single network, longit list, or multilayer list</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>m   <span class="ot">&lt;-</span> <span class="fu">ergm</span>(sn <span class="sc">~</span> edges <span class="sc">+</span> ...)        <span class="co"># modeling happens in ergm/statnet</span></span></code></pre></div>
+<p>For latent-factor and DBN workflows, see the project-site article on
+<code>lame</code> and <code>dbn</code>.</p>
+</div>
+<div id="references" class="section level2">
+<h2>references</h2>
+<ol style="list-style-type: decimal">
+<li><p>Butts, C. T. (2008). network: A Package for Managing Relational
+Data in R. Journal of Statistical Software, 24(2), 1-36. <a href="doi:10.18637/jss.v024.i02" class="uri">doi:10.18637/jss.v024.i02</a></p></li>
+<li><p>Cranmer, S. J., Desmarais, B. A., &amp; Morgan, J. W. (2021).
+Inferential Network Analysis. Cambridge University Press. <a href="doi:10.1017/9781316662915" class="uri">doi:10.1017/9781316662915</a></p></li>
+<li><p>Hunter, D. R., Handcock, M. S., Butts, C. T., Goodreau, S. M.,
+&amp; Morris, M. (2008). ergm: A Package to Fit, Simulate and Diagnose
+Exponential-Family Models for Networks. Journal of Statistical Software,
+24(3), 1-29. <a href="doi:10.18637/jss.v024.i03" class="uri">doi:10.18637/jss.v024.i03</a></p></li>
+<li><p>Krivitsky, P. N., &amp; Handcock, M. S. (2014). A Separable Model
+for Dynamic Networks. Journal of the Royal Statistical Society: Series B
+(Statistical Methodology), 76(1), 29-46. <a href="doi:10.1111/rssb.12014" class="uri">doi:10.1111/rssb.12014</a></p></li>
+<li><p>Snijders, T. A. B., Pattison, P. E., Robins, G. L., &amp;
+Handcock, M. S. (2006). New Specifications for Exponential Random Graph
+Models. Sociological Methodology, 36(1), 99-153. <a href="doi:10.1111/j.1467-9531.2006.00176.x" class="uri">doi:10.1111/j.1467-9531.2006.00176.x</a></p></li>
+</ol>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

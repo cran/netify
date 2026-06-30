@@ -1,0 +1,342 @@
+#' Create multilayer networks from multiple netify objects
+#'
+#' `layer_netify` combines multiple netify
+#' objects into a single multilayer network structure. each input network becomes
+#' a layer in the resulting multilayer network, enabling analysis of multiple
+#' relationship types or network views simultaneously.
+#'
+#' @param netlet_list a list of netify objects to layer together, or the first
+#'   netify object when passing multiple objects as separate arguments via
+#'   \code{...}. all objects must have compatible dimensions and attributes
+#'   (see details).
+#' @param ... additional netify objects. when provided, \code{netlet_list}
+#'   should be a single netify object and all arguments are collected into a
+#'   list. this allows calling \code{layer_netify(net1, net2, net3)} as a
+#'   shorthand for \code{layer_netify(list(net1, net2, net3))}.
+#' @param layer_labels character vector specifying names for each layer. if NULL
+#'   (default), uses names from netlet_list or generates generic labels ("layer1",
+#'   "layer2", etc.). length must match the number of netify objects.
+#'
+#' @return a multilayer netify object with structure depending on input type:
+#'   \itemize{
+#'     \item \strong{cross-sectional input}: 3d array \code{[actors x actors x layers]}
+#'     \item \strong{longitudinal array input}: 4d array \code{[actors x actors x layers x time]}
+#'     \item \strong{longitudinal list input}: list of 3d arrays, one per time period
+#'   }
+#'
+#'   the returned object maintains the netify class and includes:
+#'   \itemize{
+#'     \item combined nodal attributes (if compatible)
+#'     \item combined dyadic attributes (if compatible)
+#'     \item layer information accessible via \code{attr(obj, 'layers')}
+#'     \item all standard netify attributes
+#'   }
+#'
+#' @details
+#' \strong{compatibility requirements:}
+#'
+#' all netify objects in netlet_list must have identical:
+#' \itemize{
+#'   \item network type (cross-sectional or longitudinal)
+#'   \item dimensions (same actors and time periods)
+#'   \item mode (all unipartite or all bipartite)
+#'   \item actor composition (same actors in same order)
+#' }
+#'
+#' \strong{mixed directedness:}
+#'
+#' layers are allowed to have different symmetry settings (e.g., some symmetric
+#' and others directed). when layers have mixed directedness, the
+#' \code{symmetric} attribute is stored as a named logical vector with one
+#' element per layer.
+#'
+#' \strong{attribute handling:}
+#'
+#' nodal and dyadic attributes are combined when possible:
+#' \itemize{
+#'   \item if attributes are identical across layers, the first layer's attributes are used
+#'   \item if attributes differ but have compatible structure, they are merged
+#'   \item if attributes are incompatible, a warning is issued and attributes must be
+#'     added manually using \code{add_node_vars()} or \code{add_dyad_vars()}
+#' }
+#'
+#'
+#' @note
+#' memory usage increases with the number of layers. for large networks with many
+#' layers, consider whether all layers are necessary for your analysis.
+#'
+#'
+#' @examples
+#' # load example data
+#' data(icews)
+#'
+#' # example 1: cross-sectional multilayer network
+#' icews_10 <- icews[icews$year == 2010, ]
+#'
+#' # create separate networks for different interaction types
+#' verbal_coop <- netify(
+#'     icews_10,
+#'     actor1 = "i", actor2 = "j",
+#'     symmetric = FALSE,
+#'     weight = "verbCoop",
+#'     nodal_vars = c("i_log_gdp", "i_log_pop"),
+#'     dyad_vars = "verbConf"
+#' )
+#'
+#' material_coop <- netify(
+#'     icews_10,
+#'     actor1 = "i", actor2 = "j",
+#'     symmetric = FALSE,
+#'     weight = "matlCoop",
+#'     nodal_vars = "i_polity2",
+#'     dyad_vars = "matlConf"
+#' )
+#'
+#' # layer them together
+#' coop_multilayer <- layer_netify(
+#'     netlet_list = list(verbal_coop, material_coop),
+#'     layer_labels = c("verbal", "material")
+#' )
+#'
+#' # check structure
+#' dim(get_raw(coop_multilayer)) # [actors x actors x 2]
+#' attr(coop_multilayer, "layers") # "verbal" "material"
+#'
+#' \donttest{
+#' # example 2: longitudinal multilayer (array format)
+#' verbal_longit <- netify(
+#'     icews,
+#'     actor1 = "i", actor2 = "j", time = "year",
+#'     symmetric = FALSE,
+#'     weight = "verbCoop",
+#'     output_format = "longit_array"
+#' )
+#'
+#' material_longit <- netify(
+#'     icews,
+#'     actor1 = "i", actor2 = "j", time = "year",
+#'     symmetric = FALSE,
+#'     weight = "matlCoop",
+#'     output_format = "longit_array"
+#' )
+#'
+#' # create longitudinal multilayer
+#' longit_multilayer <- layer_netify(
+#'     list(verbal_longit, material_longit),
+#'     layer_labels = c("verbal", "material")
+#' )
+#'
+#' dim(get_raw(longit_multilayer)) # [actors x actors x 2 x years]
+#' }
+#'
+#' @author cassy dorff, shahryar minhas
+#'
+#' @export layer_netify
+
+layer_netify <- function(netlet_list, ..., layer_labels = NULL) {
+	# support passing netify objects as separate arguments
+	dots <- list(...)
+	if (length(dots) > 0) {
+		if (is_netify(netlet_list)) {
+			netlet_list <- c(list(netlet_list), dots)
+		} else {
+			cli::cli_abort(
+				"When passing extra arguments via {.code ...}, the first argument must be a netify object."
+			)
+		}
+	}
+
+	# user input checks
+	lapply(netlet_list, netify_check)
+
+	# set layer labels
+	layer_labels <- set_layer_labels(netlet_list, layer_labels)
+
+	# store attributes from netlet objects
+	attribs_list <- lapply(netlet_list, attributes)
+
+	# define relevant attribute types that must be identical
+	rel_attrs <- c(
+		"netify_type", "actor_time_uniform",
+		"actor_pds", "mode"
+	)
+
+	# check if attributes compatible
+	check_layer_compatible(
+		a_list = attribs_list,
+		elems = rel_attrs,
+		msg = c(
+			"Error: The ",
+			" attribute is not identical across the netlets in `netlet_list`."
+		)
+	)
+
+	# extract first set of attributes for reuse
+	first_attribs <- attribs_list[[1]]
+
+	# generate weights value for multilayer case
+	weight_collapse <- vapply(attribs_list, function(x) {
+		w <- x[["weight"]]
+		if (is.null(w)) {
+			"NULL"
+		} else if (is.logical(w)) {
+			if (w) "edge_value" else "NULL"
+		} else {
+			as.character(w)
+		}
+	}, character(1))
+	weight_collapse <- paste(weight_collapse, collapse = ", ")
+
+	# build weight label descriptor
+	weight_label_collapse <- paste(
+		vapply(attribs_list, `[[`, character(1), "detail_weight"),
+		collapse = " | "
+	)
+
+	# pull out logical for whether we have binary weights
+	is_binary_vec <- vapply(attribs_list, `[[`, logical(1), "is_binary")
+
+	# check to make sure that the networks can be layered
+	msrmnts_list <- lapply(netlet_list, netify_measurements)
+
+	# define relevant measurements that must be identical
+	rel_msrs <- c(
+		"row_actors", "col_actors", "time",
+		"n_row_actors", "n_col_actors", "n_time"
+	)
+
+	# check if dimensions compatible
+	check_layer_compatible(
+		a_list = msrmnts_list,
+		elems = rel_msrs,
+		msg = c(
+			"Error: ",
+			" are not identical across the netlets in `netlet_list`."
+		)
+	)
+
+	# extract measurements once for reuse
+	first_msrmnts <- msrmnts_list[[1]]
+	netlet_type <- first_attribs$netify_type
+	n_layers <- length(netlet_list)
+	n_time <- first_msrmnts$n_time
+	n_row_actors <- first_msrmnts$n_row_actors
+	n_col_actors <- first_msrmnts$n_col_actors
+	time <- first_msrmnts$time
+	row_actors <- first_msrmnts$row_actors
+	col_actors <- first_msrmnts$col_actors
+
+	# pull out raw versions of data
+	netlet_raws <- lapply(netlet_list, get_raw)
+
+	# symmetric: named vector if mixed directedness, otherwise scalar
+	symmetric_vec <- vapply(attribs_list, `[[`, logical(1), "symmetric")
+	names(symmetric_vec) <- layer_labels
+	if (length(unique(symmetric_vec)) == 1) {
+		symmetric_out <- unname(symmetric_vec[1])
+	} else {
+		symmetric_out <- symmetric_vec
+	}
+
+	# create base attributes list
+	base_attrs <- list(
+		netify_type = netlet_type,
+		actor_time_uniform = first_attribs$actor_time_uniform,
+		actor_pds = first_attribs$actor_pds,
+		weight = weight_collapse,
+		detail_weight = weight_label_collapse,
+		is_binary = is_binary_vec,
+		symmetric = symmetric_out,
+		mode = first_attribs$mode,
+		layers = layer_labels,
+		diag_to_NA = get_attribs(attribs_list, "diag_to_NA"),
+		missing_to_zero = get_attribs(attribs_list, "missing_to_zero"),
+		sum_dyads = get_attribs(attribs_list, "sum_dyads"),
+		nodal_data = NULL,
+		dyad_data = NULL
+	)
+
+	# cross-sec case
+	if (netlet_type == "cross_sec") {
+		# define and fill array
+		netlet <- array(NA,
+			dim = c(n_row_actors, n_col_actors, n_layers),
+			dimnames = list(row_actors, col_actors, layer_labels)
+		)
+
+		for (ii in seq_len(n_layers)) {
+			netlet[, , ii] <- netlet_raws[[ii]]
+		}
+	}
+
+	# array case
+	if (netlet_type == "longit_array") {
+		# define and fill array
+		netlet <- array(NA,
+			dim = c(n_row_actors, n_col_actors, n_layers, n_time),
+			dimnames = list(row_actors, col_actors, layer_labels, time)
+		)
+
+		for (ii in seq_len(n_layers)) {
+			netlet[, , ii, ] <- netlet_raws[[ii]]
+		}
+	}
+
+	# longit list case
+	if (netlet_type == "longit_list") {
+		# pre-allocate list
+		netlet <- vector("list", n_time)
+		names(netlet) <- time
+
+		# create cross-sectional attributes once
+		cs_attrs <- base_attrs
+		cs_attrs$netify_type <- "cross_sec"
+		cs_attrs$actor_time_uniform <- NULL
+		cs_attrs$actor_pds <- NULL
+
+		for (tt in seq_len(n_time)) {
+			# define array
+			arr <- array(NA,
+				dim = c(n_row_actors[[tt]], n_col_actors[[tt]], n_layers),
+				dimnames = list(row_actors[[tt]], col_actors[[tt]], layer_labels)
+			)
+
+			# fill in array
+			for (ii in seq_len(n_layers)) {
+				arr[, , ii] <- netlet_raws[[ii]][[tt]]
+			}
+
+			# add attributes
+			class(arr) <- "netify"
+			attributes(arr) <- c(attributes(arr), cs_attrs)
+
+			netlet[[tt]] <- arr
+		}
+	}
+
+	# add attributes to main object
+	class(netlet) <- "netify"
+	attributes(netlet) <- c(attributes(netlet), base_attrs)
+
+	# handle nodal data
+	nodal_data_list <- lapply(attribs_list, `[[`, "nodal_data")
+	if (identical_recursive(nodal_data_list)) {
+		attr(netlet, "nodal_data") <- nodal_data_list[[1]]
+	} else {
+		attr(netlet, "nodal_data") <- reduce_combine_nodal_attr(
+			attribs_list, msrmnts_list, netlet_type
+		)
+	}
+
+	# handle dyad data
+	dyad_data_list <- lapply(attribs_list, `[[`, "dyad_data")
+	if (identical_recursive(dyad_data_list)) {
+		attr(netlet, "dyad_data") <- dyad_data_list[[1]]
+		} else {
+			attr(netlet, "dyad_data") <- reduce_combine_dyad_attr(
+				attribs_list, msrmnts_list, netlet_type, layer_labels
+			)
+		}
+
+	return(netlet)
+}

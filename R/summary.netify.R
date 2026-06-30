@@ -1,0 +1,351 @@
+#' Calculate graph-level statistics for netify objects
+#'
+#' computes graph-level statistics for netify objects, including density,
+#' reciprocity, centralization measures, and custom metrics. handles
+#' cross-sectional and longitudinal networks, as well as multilayer structures.
+#'
+#' @param object a netify object containing network data
+#' @param ... additional arguments, including:
+#'   \describe{
+#'     \item{\code{other_stats}}{named list of custom functions to calculate
+#'       additional graph-level statistics. each function should accept the
+#'       current netify slice and return a named vector of scalar values.}
+#'   }
+#'
+#' @return a data frame with one row per network/time period containing:
+#'
+#'   \strong{basic network properties:}
+#'   \describe{
+#'     \item{\code{net}}{network/time identifier}
+#'     \item{\code{layer}}{layer name (for multilayer networks)}
+#'     \item{\code{num_actors}}{number of actors (or \code{num_row_actors} and
+#'       \code{num_col_actors} for bipartite networks)}
+#'     \item{\code{density}}{proportion of possible ties that exist}
+#'     \item{\code{num_edges}}{total number of edges (count of every
+#'       non-zero entry; for signed networks, negative-weight ties are
+#'       included alongside positive ones)}
+#'     \item{\code{prop_edges_missing}}{proportion of potential edge dyads
+#'       that are na. uses the same denominator as \code{density} (off-diagonal
+#'       cells for unipartite with \code{diag_to_NA}, halved for symmetric
+#'       networks, all cells for bipartite), so
+#'       \code{density + prop_edges_missing + observed_zero_fraction = 1}.}
+#'     \item{\code{prop_unknown_edges}}{proportion of potential edges that are
+#'       na because they were *unobserved* at the data-entry stage (as opposed
+#'       to structurally absent or on-diagonal). only appears when the netlet
+#'       was built with \code{missing_to_zero = FALSE}; otherwise unobserved
+#'       dyads have been filled with 0 and the column would be identically
+#'       zero.}
+#'   }
+#'
+#'   \strong{for weighted networks only:}
+#'   \describe{
+#'     \item{\code{mean_edge_weight}}{average weight of realized non-zero
+#'       edges. signed networks include negative ties; observed zero non-ties
+#'       and missing dyads are excluded.}
+#'     \item{\code{sd_edge_weight}}{standard deviation of realized non-zero
+#'       edge weights}
+#'     \item{\code{median_edge_weight}}{median realized non-zero edge weight}
+#'     \item{\code{min_edge_weight}, \code{max_edge_weight}}{range of realized
+#'       non-zero edge weights}
+#'   }
+#'
+#'   \strong{structural measures:}
+#'   \describe{
+#'     \item{\code{competition} (or \code{competition_row}/\code{competition_col})}{
+#'       herfindahl-hirschman index measuring concentration of ties. calculated as
+#'       \eqn{\sum_{i=1}^{n} (s_i)^2} where \eqn{s_i} is actor i's share of total
+#'       ties. ranges from 1/n (equal distribution) to 1 (one actor has all ties).}
+#'     \item{\code{sd_of_actor_means} (or \code{sd_of_row_means}/\code{sd_of_col_means})}{
+#'       standard deviation of actors' average tie strengths, measuring heterogeneity
+#'       in actor activity levels}
+#'     \item{\code{transitivity}}{global clustering coefficient (probability that
+#'       two neighbors of a node are connected). returns \code{na} when the
+#'       coefficient is undefined.}
+#'   }
+#'
+#'   \strong{for directed networks only:}
+#'   \describe{
+#'     \item{\code{covar_of_row_col_means}}{correlation between actors' sending and
+#'       receiving means. the column name is retained for compatibility.}
+#'     \item{\code{reciprocity}}{pearson correlation between the adjacency
+#'       matrix and its transpose. this measures the linear association
+#'       between outgoing and incoming tie weights for each dyad (i.e., how
+#'       similar \eqn{a_{ij}} is to \eqn{a_{ji}} across all dyads). values
+#'       near 1 indicate strong reciprocity, while values near 0 indicate no
+#'       relationship. note: this differs from the traditional edge-based
+#'       reciprocity (proportion of mutual dyads) used by igraph and other
+#'       packages.}
+#'     \item{\code{mutual}}{proportion of mutual dyads: the fraction of
+#'       connected dyad pairs where both directions are present. ranges from 0
+#'       (no mutual ties) to 1 (all ties are reciprocated). this is the
+#'       traditional edge-based reciprocity measure used by igraph and most
+#'       network analysis textbooks.}
+#'   }
+#'
+#' @details
+#' the function automatically adapts calculations based on network properties:
+#' \itemize{
+#'   \item \strong{bipartite networks}: reports row and column actors separately
+#'   \item \strong{directed networks}: calculates separate statistics for in/out ties
+#'   \item \strong{weighted networks}: includes weight-based statistics
+#'   \item \strong{multilayer networks}: processes each layer independently
+#'   \item \strong{longitudinal networks}: calculates statistics for each time period
+#' }
+#'
+#' \strong{competition index interpretation:}
+#'
+#' the competition measure (hhi) captures how concentrated network ties are among
+#' actors. low values indicate distributed activity across many actors (competitive),
+#' while high values indicate concentration among few actors (monopolistic). this
+#' is particularly useful for analyzing power dynamics or resource distribution in
+#' networks.
+#'
+#' \strong{custom statistics:}
+#'
+#' add custom graph-level metrics using the \code{other_stats} parameter:
+#'
+#' \preformatted{
+#' # example: community detection
+#' modularity_stat <- function(net) {
+#'   g <- netify_to_igraph(net)
+#'   comm <- igraph::cluster_walktrap(g)
+#'   c(modularity = igraph::modularity(comm),
+#'     n_communities = length(unique(comm$membership)))
+#' }
+#'
+#' summary(net, other_stats = list(community = modularity_stat))
+#' }
+#'
+#' @note
+#' for large longitudinal or multilayer networks, computation can be intensive.
+#' consider using \code{\link{subset_netify}} to analyze specific time periods
+#' or layers.
+#'
+#' density uses the full potential-dyad denominator. missing edges (na values)
+#' are not counted as present ties; they are reported separately in
+#' \code{prop_edges_missing}.
+#'
+#' @references
+#' dorff, c., gallop, m., & minhas, s. (2023). "networks of violence: predicting
+#' conflict in nigeria." \emph{journal of politics}, 85(1).
+#'
+#' @examples
+#' # load example data
+#' data(icews)
+#'
+#' \donttest{
+#' # basic usage
+#' net <- netify(
+#'     icews,
+#'     actor1 = "i", actor2 = "j", time = "year",
+#'     symmetric = FALSE,
+#'     weight = "verbCoop"
+#' )
+#'
+#' # get summary
+#' summary(net)
+#' }
+#'
+#' \donttest{
+#' # add custom statistics - community detection
+#' comm_stats <- function(mat) {
+#'     g <- netify_to_igraph(mat)
+#'     comm <- igraph::cluster_spinglass(g)
+#'     c(
+#'         n_communities = length(comm$csize),
+#'         modularity = comm$modularity
+#'     )
+#' }
+#'
+#' # apply to subset for efficiency
+#' sub_net <- subset_netify(net, time = as.character(2013:2014))
+#' summary(sub_net, other_stats = list(community = comm_stats))
+#' }
+#'
+#' @author cassy dorff, shahryar minhas
+#'
+#' @importFrom igraph transitivity
+#'
+#' @export
+
+summary.netify <- function(object, ...) {
+	####
+	# prelim checks
+	# check if netify object
+	netify_check(object)
+
+	# get summary args
+	summary_args <- list(...)
+
+	# cache attributes
+	obj_attrs <- attributes(object)
+	layers <- obj_attrs$layers
+	n_layers <- length(layers)
+	netlet_type <- obj_attrs$netify_type
+	is_cross_sec <- netlet_type == "cross_sec"
+	# keep all columns for mixed-directedness multilayer networks
+	is_unipartite <- obj_attrs$mode == "unipartite"
+	is_symmetric <- is_unipartite &&
+		if (length(obj_attrs$symmetric) > 1) FALSE else isTRUE(obj_attrs$symmetric)
+	is_all_binary <- all(obj_attrs$is_binary)
+
+	# check for ego network
+	ego_netlet <- isTRUE(obj_attrs$ego_netlet) || isTRUE(obj_attrs$ego_netify)
+	if (ego_netlet) {
+		ego_vec <- obj_attrs$ego_vec %||% obj_attrs$ego_id %||% obj_attrs$ego_entry
+		ego_longit <- isTRUE(obj_attrs$ego_longit)
+	}
+	####
+
+	####
+	# pre-allocate results list
+	net_stats_l_multi <- vector("list", n_layers)
+
+	# iterate through each layer
+	for (i in seq_along(layers)) {
+		layer <- layers[i]
+
+		####
+		# extract layer efficiently
+		if (n_layers == 1) {
+			netlet <- object
+		} else {
+			netlet <- subset_netify(object, layers = layer)
+			obj_attrs <- attributes(netlet)
+		}
+
+		# convert to list format for processing
+		netlet_list <- switch(netlet_type,
+			"cross_sec" = list(netlet),
+			"longit_array" = array_to_list(netlet),
+			"longit_list" = netlet
+		)
+		####
+
+		####
+		# calc stats across netlet(s) - vectorized where possible
+		net_stats_list <- lapply(netlet_list, function(mat) {
+			graph_stats_for_netlet(mat, obj_attrs, summary_args)
+		})
+		####
+
+		####
+		# efficient data frame creation
+		net_stats <- do.call("rbind", net_stats_list)
+		net_names <- names(netlet_list) %||% rownames(net_stats)
+		# backfill so the net identifier column is always present
+		if (is.null(net_names) || length(net_names) == 0L) {
+			net_names <- as.character(seq_len(length(netlet_list)))
+		}
+
+		net_stats <- as.data.frame(net_stats, stringsAsFactors = FALSE)
+		net_stats$net <- net_names
+		net_stats$layer <- layer
+
+		# store in pre-allocated list
+		net_stats_l_multi[[i]] <- net_stats
+	}
+	####
+
+	####
+	# combine all results efficiently
+	net_stats <- do.call("rbind", net_stats_l_multi)
+	rownames(net_stats) <- NULL
+
+	# reorder columns - check if columns exist first
+	id_cols <- c("net", "layer")
+	# only include id_cols that actually exist in net_stats
+	existing_id_cols <- id_cols[id_cols %in% names(net_stats)]
+	stat_cols <- setdiff(names(net_stats), id_cols)
+
+	# only reorder if we have the expected columns
+	if (length(existing_id_cols) > 0) {
+		net_stats <- net_stats[, c(existing_id_cols, stat_cols)]
+	}
+
+	# drop layer column if only one layer
+	if (n_layers == 1) {
+		net_stats$layer <- NULL
+	}
+
+	# simplify column names based on network type
+	if (is_unipartite) {
+		# rename num_row_actors to num_actors
+		names(net_stats)[names(net_stats) == "num_row_actors"] <- "num_actors"
+		# remove num_col_actors
+		net_stats$num_col_actors <- NULL
+	} else {
+		# bipartite networks cannot have reciprocity or transitivity
+		bipartite_remove <- c("reciprocity", "mutual", "transitivity")
+		net_stats[bipartite_remove] <- NULL
+	}
+
+	# simplify for undirected networks
+	if (is_symmetric) {
+		# rename competition and sd measures
+		names(net_stats)[names(net_stats) == "competition_row"] <- "competition"
+		names(net_stats)[names(net_stats) == "sd_of_row_means"] <- "sd_of_actor_means"
+
+		# remove directed-only statistics
+		cols_to_remove <- c(
+			"competition_col", "sd_of_col_means",
+			"covar_of_row_col_means", "reciprocity", "mutual"
+		)
+		net_stats[cols_to_remove] <- NULL
+	}
+
+	# remove weight statistics for binary networks
+	if (is_all_binary) {
+		weight_cols <- c(
+			"mean_edge_weight", "sd_edge_weight",
+			"min_edge_weight", "max_edge_weight",
+			"median_edge_weight"
+		)
+		net_stats[weight_cols] <- NULL
+	}
+
+	# keep unknown-edge shares only when missing dyads are preserved
+	mtz_all <- all(vapply(
+		attr(object, "missing_to_zero"), isTRUE, logical(1)
+	))
+	if (mtz_all) net_stats$prop_unknown_edges <- NULL
+	####
+
+	####
+	# handle ego networks efficiently
+	if (ego_netlet) {
+		if (!ego_longit) {
+			# non-longitudinal ego network
+			if (is_cross_sec) {
+				net_stats$layer <- ego_vec
+			} else {
+				net_stats$layer <- net_stats$net
+			}
+			net_stats$net <- 1
+		} else {
+			# longitudinal ego network
+			net_split <- strsplit(net_stats$net, "__", fixed = TRUE)
+			has_compound_names <- vapply(net_split, length, integer(1)) >= 2L
+			if (all(has_compound_names)) {
+				ego_units <- vapply(net_split, `[`, character(1), 1)
+				ego_pds <- vapply(net_split, `[`, character(1), 2)
+				net_stats$net <- ego_pds
+				net_stats$layer <- ego_units
+			} else {
+				net_stats$layer <- ego_vec
+			}
+		}
+
+		# keep identifier columns first
+		net_stats <- net_stats[, c(
+			"net", "layer",
+			setdiff(names(net_stats), c("net", "layer"))
+		)]
+	}
+	####
+
+	####
+	class(net_stats) <- c("summary.netify", "data.frame")
+	return(net_stats)
+	####
+}

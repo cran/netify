@@ -1,0 +1,375 @@
+set.seed(6886)
+skip_on_cran()
+
+# load relevant datasets from package
+data(icews)
+
+# create cross-sectional versions
+icews_10 = icews[icews$year == "2010", ]
+
+# create individual layer networks for testing
+# cross-sectional networks
+icews_verbCoop_10 = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "verbCoop"
+)
+icews_matlCoop_10 = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "matlCoop"
+)
+icews_verbConf_10 = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "verbConf"
+)
+icews_matlConf_10 = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "matlConf"
+)
+
+# longitudinal list format networks
+icews_verbCoop_l = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "verbCoop", output_format = "longit_list"
+)
+icews_matlCoop_l = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "matlCoop", output_format = "longit_list"
+)
+icews_verbConf_l = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "verbConf", output_format = "longit_list"
+)
+icews_matlConf_l = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "matlConf", output_format = "longit_list"
+)
+
+# longitudinal array format networks
+icews_verbCoop_a = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "verbCoop", output_format = "longit_array"
+)
+icews_matlCoop_a = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "matlCoop", output_format = "longit_array"
+)
+icews_verbConf_a = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "verbConf", output_format = "longit_array"
+)
+icews_matlConf_a = netify(
+	icews,
+	actor1 = "i", actor2 = "j", time = "year",
+	symmetric = FALSE, weight = "matlConf", output_format = "longit_array"
+)
+
+# networks with attributes for testing attribute handling
+icews_verbCoop_attrs = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "verbCoop",
+	nodal_vars = c("i_polity2", "i_log_gdp"),
+	dyad_vars = c("matlCoop", "verbConf")
+)
+
+icews_matlCoop_attrs = netify(
+	icews_10,
+	actor1 = "i", actor2 = "j",
+	symmetric = FALSE, weight = "matlCoop",
+	nodal_vars = c("i_polity2", "i_log_gdp"),
+	dyad_vars = c("verbCoop", "matlConf")
+)
+
+test_that(
+	"layer_netify: cross-sectional basic functionality",
+	{
+	skip_on_cran()
+		# create multilayer network
+		multi_net = layer_netify(
+			netlet_list = list(icews_verbCoop_10, icews_matlCoop_10),
+			layer_labels = c("Verbal", "Material")
+		)
+
+		# check class
+		expect_s3_class(multi_net, "netify")
+
+		# check dimensions
+		expect_equal(length(dim(multi_net)), 3)
+		expect_equal(dim(multi_net)[3], 2)
+
+		# check layer labels
+		expect_equal(attr(multi_net, "layers"), c("Verbal", "Material"))
+
+		# check that netify_type is still cross_sec
+		expect_equal(attr(multi_net, "netify_type"), "cross_sec")
+	}
+)
+
+test_that(
+	"layer_netify: cross-sectional with 4 layers",
+	{
+	skip_on_cran()
+		# create multilayer network with 4 layers
+		multi_net = layer_netify(
+			netlet_list = list(
+				icews_verbCoop_10, icews_matlCoop_10,
+				icews_verbConf_10, icews_matlConf_10
+			),
+			layer_labels = c("verbCoop", "matlCoop", "verbConf", "matlConf")
+		)
+
+		# check dimensions
+		expect_equal(dim(multi_net)[3], 4)
+
+		# check all layer labels
+		expect_equal(
+			attr(multi_net, "layers"),
+			c("verbCoop", "matlCoop", "verbConf", "matlConf")
+		)
+
+		# check weight attribute combines all weights
+		expect_true(grepl("verbCoop", attr(multi_net, "weight")))
+		expect_true(grepl("matlConf", attr(multi_net, "weight")))
+	}
+)
+
+# test longitudinal list format
+test_that(
+	"layer_netify: longitudinal list basic functionality",
+	{
+	skip_on_cran()
+		# create multilayer network
+		multi_net_l = layer_netify(
+			netlet_list = list(icews_verbCoop_l, icews_matlCoop_l),
+			layer_labels = c("Verbal", "Material")
+		)
+
+		# check it's still a list
+		expect_type(multi_net_l, "list")
+		expect_s3_class(multi_net_l, "netify")
+
+		# check each time period is now 3d
+		first_period = multi_net_l[[1]]
+		expect_equal(length(dim(first_period)), 3)
+		expect_equal(dim(first_period)[3], 2)
+
+		# check netify_type
+		expect_equal(attr(multi_net_l, "netify_type"), "longit_list")
+
+		# check time periods preserved
+		expect_equal(length(multi_net_l), 13) # 13 years in icews data
+		expect_equal(names(multi_net_l), as.character(2002:2014))
+	}
+)
+
+test_that(
+	"layer_netify: longitudinal list with 4 layers",
+	{
+	skip_on_cran()
+		# create multilayer network
+		multi_net_l = layer_netify(
+			netlet_list = list(
+				icews_verbCoop_l, icews_matlCoop_l,
+				icews_verbConf_l, icews_matlConf_l
+			),
+			layer_labels = c("verbCoop", "matlCoop", "verbConf", "matlConf")
+		)
+
+		# check dimensions of first time period
+		expect_equal(dim(multi_net_l[[1]])[3], 4)
+
+		# check layer labels preserved in each time period
+		expect_equal(
+			dimnames(multi_net_l[[1]])[[3]],
+			c("verbCoop", "matlCoop", "verbConf", "matlConf")
+		)
+	}
+)
+
+# test longitudinal array format
+test_that(
+	"layer_netify: longitudinal array basic functionality",
+	{
+	skip_on_cran()
+		# create multilayer network
+		multi_net_a = layer_netify(
+			netlet_list = list(icews_verbCoop_a, icews_matlCoop_a),
+			layer_labels = c("Verbal", "Material")
+		)
+
+		# check it's a 4d array
+		expect_equal(length(dim(multi_net_a)), 4)
+		expect_equal(dim(multi_net_a)[3], 2) # 2 layers
+		expect_equal(dim(multi_net_a)[4], 13) # 13 time periods
+
+		# check netify_type
+		expect_equal(attr(multi_net_a, "netify_type"), "longit_array")
+
+		# check dimnames
+		expect_equal(dimnames(multi_net_a)[[3]], c("Verbal", "Material"))
+		expect_equal(dimnames(multi_net_a)[[4]], as.character(2002:2014))
+	}
+)
+
+# test automatic layer labeling
+test_that(
+	"layer_netify: automatic layer labeling",
+	{
+	skip_on_cran()
+		unnamed_list = list(icews_verbCoop_10, icews_matlCoop_10)
+		multi_net = layer_netify(unnamed_list)
+		expect_equal(attr(multi_net, "layers"), c("layer1", "layer2"))
+
+		multi_net2 = layer_netify(
+			netlet_list = list(icews_verbCoop_10, icews_matlCoop_10),
+			layer_labels = NULL
+		)
+		expect_equal(attr(multi_net2, "layers"), c("layer1", "layer2"))
+	}
+)
+
+
+# test attribute handling
+test_that(
+	"layer_netify: identical attributes preserved",
+	{
+	skip_on_cran()
+		# create multilayer with identical attributes
+		multi_net = layer_netify(
+			list(icews_verbCoop_attrs, icews_matlCoop_attrs),
+			layer_labels = c("Verbal", "Material")
+		)
+
+		# check nodal data preserved
+		expect_false(is.null(attr(multi_net, "nodal_data")))
+
+		# check dyad data preserved
+		expect_false(is.null(attr(multi_net, "dyad_data")))
+	}
+)
+
+# test weight handling
+test_that(
+	"layer_netify: weight attributes correctly combined",
+	{
+	skip_on_cran()
+		multi_net = layer_netify(
+			list(
+				icews_verbCoop_10, icews_matlCoop_10,
+				icews_verbConf_10, icews_matlConf_10
+			)
+		)
+
+		# check combined weight string
+		weight_str = attr(multi_net, "weight")
+		expect_equal(weight_str, "verbCoop, matlCoop, verbConf, matlConf")
+
+		# check is_binary vector
+		expect_length(attr(multi_net, "is_binary"), 4)
+		expect_type(attr(multi_net, "is_binary"), "logical")
+	}
+)
+
+# test subsetting multilayer networks
+test_that(
+	"layer_netify: subset multilayer networks",
+	{
+	skip_on_cran()
+		# create multilayer
+		multi_net = layer_netify(
+			list(
+				icews_verbCoop_10, icews_matlCoop_10,
+				icews_verbConf_10, icews_matlConf_10
+			),
+			layer_labels = c("verbCoop", "matlCoop", "verbConf", "matlConf")
+		)
+
+		# subset to specific layers
+		subset_multi = subset_netify(
+			multi_net,
+			layers = c("verbCoop", "matlCoop")
+		)
+
+		# check it's still multilayer with 2 layers
+		expect_equal(dim(subset_multi)[3], 2)
+		expect_equal(attr(subset_multi, "layers"), c("verbCoop", "matlCoop"))
+
+		single_layer = subset_netify(
+			multi_net,
+			layers = "verbCoop"
+		)
+
+		# check it's now 2d
+		expect_equal(length(dim(single_layer)), 2)
+		expect_equal(attr(single_layer, "layers"), "verbCoop")
+	}
+)
+
+# test data integrity
+test_that(
+	"layer_netify: data integrity maintained",
+	{
+	skip_on_cran()
+		# create multilayer
+		multi_net = layer_netify(
+			list(icews_verbCoop_10, icews_matlCoop_10),
+			layer_labels = c("Verbal", "Material")
+		)
+
+		# extract raw data
+		raw_multi = get_raw(multi_net)
+		raw_verb = get_raw(icews_verbCoop_10)
+		raw_matl = get_raw(icews_matlCoop_10)
+
+		# check that data matches
+		expect_equal(raw_multi[, , 1], raw_verb)
+		expect_equal(raw_multi[, , 2], raw_matl)
+
+		# check actors preserved
+		expect_equal(dimnames(raw_multi)[[1]], rownames(raw_verb))
+		expect_equal(dimnames(raw_multi)[[2]], colnames(raw_verb))
+	}
+)
+
+test_that(
+	"layer_netify: handles named lists correctly",
+	{
+	skip_on_cran()
+		named_list = list(
+			verbal = icews_verbCoop_10,
+			material = icews_matlCoop_10
+		)
+		multi_net_named = layer_netify(named_list)
+
+		# check it works and uses list names as layer labels
+		expect_s3_class(multi_net_named, "netify")
+		expect_equal(attr(multi_net_named, "layers"), c("verbal", "material"))
+
+		# test explicit layer_labels override list names
+		multi_net_override = layer_netify(
+			named_list,
+			layer_labels = c("VerbCoop", "MatlCoop")
+		)
+		expect_equal(attr(multi_net_override, "layers"), c("VerbCoop", "MatlCoop"))
+
+		# test mixed named/unnamed elements
+		mixed_list = list(
+			verbal = icews_verbCoop_10,
+			icews_matlCoop_10,
+			conflict = icews_verbConf_10
+		)
+		multi_net_mixed = layer_netify(mixed_list)
+		expect_equal(attr(multi_net_mixed, "layers"), c("verbal", "layer2", "conflict"))
+	}
+)

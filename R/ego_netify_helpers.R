@@ -1,0 +1,98 @@
+#' Get Neighborhood Network for Ego
+#'
+#' `get_ngbd_net_for_ego` extracts the neighborhood network for a specified ego from a given list of raw networks. it allows the user to define the neighborhood based on outgoing, incoming, or any relationship, and includes a threshold for weighted networks.
+#'
+#' @param raw_net a list of raw network matrices.
+#' @param ego a character vector specifying the name of the ego for whom to create the neighborhood network.
+#' @param threshold a numeric vector specifying the threshold for including alters in the neighborhood network. default for unweighted networks is 0 and default for weighted networks is the average edge weight.
+#' @param include_ego logical; if TRUE, the ego node will be included in the neighborhood network. default is TRUE.
+#' @param ngbd_direction a character string specifying the type of relationship to consider for directed networks. options are "out" for outgoing ties, "in" for incoming ties, and "any" for any relationship. default is "any".
+#'
+#' @return a list of neighborhood networks, each represented as a matrix.
+#'
+#' @author cassy dorff, shahryar minhas
+#'
+#' @keywords internal
+#' @noRd
+
+get_ngbd_net_for_ego <- function(
+	raw_net, ego, threshold,
+	include_ego = TRUE, ngbd_direction = "any") {
+	####
+	# iterate through nets to construct ngbds
+	ngbd_actors <- lapply(1:length(raw_net), function(ii) {
+		# get iith net and thresh
+		net <- raw_net[[ii]]
+		thresh <- threshold[ii]
+
+		# for the ego, figure out what actors have connections
+		ngbd_row <- rownames(net)[which(net[ego, ] > thresh)]
+		ngbd_col <- colnames(net)[which(net[, ego] > thresh)]
+		ngbd_any <- unique(c(ngbd_row, ngbd_col))
+
+		# add back ego if include_ego is true
+		if (include_ego) {
+			ngbd_row <- c(ego, ngbd_row)
+			ngbd_col <- c(ego, ngbd_col)
+			ngbd_any <- c(ego, ngbd_any)
+		}
+
+		# construct ngbd net based on ngbd_direction
+		#use drop=false to maintain matrix structure even for 1x1 matrices
+		if (ngbd_direction == "out") {
+			ngbd_net <- net[ngbd_row, ngbd_row, drop = FALSE]
+		}
+		if (ngbd_direction == "in") {
+			ngbd_net <- net[ngbd_col, ngbd_col, drop = FALSE]
+		}
+		if (ngbd_direction == "any") {
+			ngbd_net <- net[ngbd_any, ngbd_any, drop = FALSE]
+		}
+
+		return(ngbd_net)
+	})
+	####
+
+	####
+	# add names
+	if (length(raw_net) > 1) {
+		names(ngbd_actors) <- names(raw_net)
+	} else {
+		names(ngbd_actors) <- ego
+	}
+	####
+
+	####
+	#
+	return(ngbd_actors)
+	####
+}
+
+#' speedy extraction of time from ego-time concatenated strings
+#' @keywords internal
+#' @noRd
+extract_ego_time <- function(ego_time_vec) {
+	sub("^[^_]+__", "", ego_time_vec)
+}
+
+#' fast extraction of ego from ego-time concatenated strings
+#' @keywords internal
+#' @noRd
+extract_ego_name <- function(ego_time_vec) {
+	# extract everything before "__"
+	sub("__.*$", "", ego_time_vec)
+}
+
+#' split ego-time string into components
+#' @keywords internal
+#' @noRd
+split_ego_time <- function(ego_time_vec) {
+	out <- data.frame(
+		ego = sub("__.*$", "", ego_time_vec),
+		time = sub("^[^_]+__", "", ego_time_vec),
+		stringsAsFactors = FALSE
+	)
+
+	#
+	return(out)
+}
