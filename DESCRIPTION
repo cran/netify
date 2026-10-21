@@ -1,6 +1,6 @@
 Package: netify
 Title: Tools for Network Data Workflows
-Version: 1.5.3
+Version: 1.5.4
 Authors@R: c(
   person("Ha Eun", "Choi", email = "choiha3@msu.edu", role = c("ctb")),
   person("Cassy", "Dorff", email = "cassy.dorff@vanderbilt.edu", role = c("aut")),
@@ -32,7 +32,7 @@ RoxygenNote: 7.3.3
 URL: https://netify-dev.github.io/netify/
 BugReports: https://github.com/netify-dev/netify/issues
 NeedsCompilation: yes
-Packaged: 2026-06-25 13:33:12 UTC; s7m
+Packaged: 2026-10-21 18:33:50 UTC; s7m
 Author: Ha Eun Choi [ctb],
   Cassy Dorff [aut],
   Colin Henry [ctb],
@@ -40,4 +40,4 @@ Author: Ha Eun Choi [ctb],
   Tosin Salau [ctb]
 Maintainer: Shahryar Minhas <minhassh@msu.edu>
 Repository: CRAN
-Date/Publication: 2026-06-30 20:20:09 UTC
+Date/Publication: 2026-10-21 19:40:02 UTC
